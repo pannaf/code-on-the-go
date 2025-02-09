@@ -1,11 +1,13 @@
 from langchain_community.callbacks.human import HumanApprovalCallbackHandler
 from langchain_community.tools import ShellTool
 from langchain_openai import ChatOpenAI
+import os
 from typing import List, Tuple
+from dotenv import load_dotenv
+load_dotenv()
 
 # Initialize the LLM
 llm = ChatOpenAI(model="o3-mini")
-
 
 def translate_to_shell_command(user_input: str) -> str:
     """Use LLM to translate natural language to shell command"""
@@ -22,7 +24,9 @@ User request: {user_input}
 
 Shell command:"""
 
+    print("LLM prompt")
     response = llm.invoke(prompt).content.strip()
+    print("LLM response: ", response)
     return response if response != "INVALID" else user_input
 
 
@@ -78,7 +82,12 @@ Explain what went wrong in simple terms and how to fix it. Be concise:"""
 Command: {command}
 Output: {result}
 
-Explain what happened in simple terms. Be concise:"""
+Explain what happened in simple terms. Be concise.
+Assume I have moderate programming experience so don't explain simple things.
+You can tell me what command I ran but don't explain the command, jump right to the point.
+
+If given a program to build, run it if it is possible to check how it ran.
+"""
 
     return llm.invoke(prompt).content.strip()
 
@@ -95,13 +104,17 @@ def process_message(message: str) -> str:
     """
     try:
         # Translate natural language to shell command
+        print("Translate to shell command: ", message)
         shell_command = translate_to_shell_command(message)
 
         # Execute shell command
+        print("Execute shell command: ", shell_command)
         result = shell_tool.run(shell_command)
+        print("shell result: ", result)
 
         # Get LLM explanation
         explanation = explain_result(shell_command, result)
+        print("explanation: ", explanation)
         return explanation
 
     except Exception as e:

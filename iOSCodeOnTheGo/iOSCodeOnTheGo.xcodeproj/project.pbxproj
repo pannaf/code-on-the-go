@@ -29,9 +29,22 @@
 		795EE98C2D57F11D00C045CE /* iOSCodeOnTheGoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iOSCodeOnTheGoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		795EE9BF2D59779C00C045CE /* Exceptions for "iOSCodeOnTheGo" folder in "iOSCodeOnTheGo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 795EE9712D57F11C00C045CE /* iOSCodeOnTheGo */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		795EE9742D57F11C00C045CE /* iOSCodeOnTheGo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				795EE9BF2D59779C00C045CE /* Exceptions for "iOSCodeOnTheGo" folder in "iOSCodeOnTheGo" target */,
+			);
 			path = iOSCodeOnTheGo;
 			sourceTree = "<group>";
 		};
@@ -399,6 +412,7 @@
 				DEVELOPMENT_TEAM = 99YMYQLPTV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = iOSCodeOnTheGo/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Connect your voice to our terminal";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -430,6 +444,7 @@
 				DEVELOPMENT_TEAM = 99YMYQLPTV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = iOSCodeOnTheGo/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Connect your voice to our terminal";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

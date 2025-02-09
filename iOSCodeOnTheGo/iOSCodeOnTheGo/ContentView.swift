@@ -21,7 +21,7 @@ import SwiftUI
         @Published var isRecording = false
         @Published var isProcessing = false
         @Published var responseText: String?
-        @Published var error: String?
+        @Published var error: Bool?
         @Published var buttonColor: Color = .blue
         @Published var isPlaying = false
         @Published var playbackProgress: Double = 0.0
@@ -120,7 +120,7 @@ import SwiftUI
 
             // RICHARD IP ADDRESS - http://192.168.1.102:12000/upload
             // Use this command to figure out the endpoint: ifconfig | grep "inet " | grep -v 127.0.0.1
-            let uploadURLString = "http://192.168.1.102:12000/upload"
+            let uploadURLString = "http://192.0.0.2:12000/upload"
             guard let uploadURL = URL(string: uploadURLString) else {
                 print("DEBUG: Invalid URL: \(uploadURLString)")
                 return
@@ -159,7 +159,7 @@ import SwiftUI
                     if let error = error {
                         print("DEBUG: Upload error: \(error.localizedDescription)")
                         DispatchQueue.main.async {
-                            self.error = "Upload failed: \(error.localizedDescription)"
+                            self.error = true
                             self.isProcessing = false
                             self.buttonColor = .blue
                         }
@@ -182,7 +182,7 @@ import SwiftUI
                     else {
                         print("DEBUG: Server error - invalid response")
                         DispatchQueue.main.async {
-                            self.error = "Server error: Invalid response"
+                            self.error = true
                             self.isProcessing = false
                             self.buttonColor = .blue
                         }
@@ -199,8 +199,7 @@ import SwiftUI
                         } catch {
                             print("DEBUG: Failed to parse response: \(error)")
                             DispatchQueue.main.async {
-                                self.error =
-                                    "Failed to parse response: \(error.localizedDescription)"
+                                self.error = true
                                 self.isProcessing = false
                                 self.buttonColor = .blue
                             }
@@ -214,7 +213,7 @@ import SwiftUI
             } catch {
                 print("DEBUG: Failed to read audio file: \(error)")
                 DispatchQueue.main.async {
-                    self.error = "Failed to read audio file: \(error.localizedDescription)"
+                    self.error = true
                     self.isProcessing = false
                     self.buttonColor = .blue
                 }
@@ -222,62 +221,58 @@ import SwiftUI
         }
 
         private func startPolling(taskId: String) {
-            var attempts = 0
-            Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
-                guard let self = self else {
-                    timer.invalidate()
-                    return
-                }
+            print("DEBUG: Starting polling for taskId: \(taskId)")
 
-                attempts += 1
+            Task {
+                var attempts = 0
+                while attempts < 30 {  // Max 30 attempts
+                    attempts += 1
+                    print("DEBUG: Poll attempt \(attempts)")
 
-                // Create polling request
-                var request = URLRequest(
-                    url: URL(string: "http://192.168.1.102:12000/poll/\(taskId)")!)
-                request.httpMethod = "GET"
-                // Add any required headers
-                // request.setValue("YOUR_API_KEY", forHTTPHeaderField: "Authorization")
+                    do {
+                        // Create request
+                        let url = URL(string: "http://192.0.0.2:12000/poll/\(taskId)")!
+                        let (data, _) = try await URLSession.shared.data(from: url)
 
-                let task = URLSession.shared.dataTask(with: request) {
-                    [weak self] data, response, error in
-                    guard let self = self else { return }
+                        print("DEBUG: Poll response: \(String(data: data, encoding: .utf8) ?? "")")
 
-                    if let error = error {
-                        DispatchQueue.main.async {
-                            timer.invalidate()
-                            self.error = "Polling failed: \(error.localizedDescription)"
+                        let response = try JSONDecoder().decode(PollResponse.self, from: data)
+                        print("DEBUG: Poll decoded: ready=\(response.ready)")
+
+                        if response.ready {
+                            await MainActor.run {
+                                self.isProcessing = false
+                                self.buttonColor = .blue
+                                if let message = response.message {
+                                    self.responseText = message
+                                    self.speakResponse(message)
+                                } else if let error = response.error {
+                                    self.error = error
+                                }
+                            }
+                            return  // Exit polling when ready
+                        }
+
+                        // Wait 2 seconds before next attempt
+                        try await Task.sleep(nanoseconds: 2_000_000_000)
+
+                    } catch {
+                        print("DEBUG: Poll error: \(error)")
+                        await MainActor.run {
+                            self.error = true
                             self.isProcessing = false
                             self.buttonColor = .blue
                         }
-                        return
-                    }
-
-                    if let data = data,
-                        let response = try? JSONDecoder().decode(APIResponse.self, from: data)
-                    {
-                        DispatchQueue.main.async {
-                            timer.invalidate()
-                            self.isProcessing = false
-                            self.buttonColor = .blue
-                            self.responseText = response.message
-                            // Speak the response
-                            // TODO: remove once we get a response
-                            self.responseText = "Hello, how can I help you today?"
-                            self.speakResponse(response.message)
-                        }
+                        return  // Exit polling on error
                     }
                 }
 
-                task.resume()
-
-                // Add timeout logic
-                if attempts > 30 {  // 1 minute timeout
-                    timer.invalidate()
-                    DispatchQueue.main.async {
-                        self.isProcessing = false
-                        self.buttonColor = .blue
-                        self.error = "Request timed out. Please try again."
-                    }
+                // Timeout reached
+                print("DEBUG: Poll timeout")
+                await MainActor.run {
+                    self.isProcessing = false
+                    self.buttonColor = .blue
+                    self.error = true
                 }
             }
         }
@@ -355,6 +350,12 @@ import SwiftUI
         let message: String
     }
 
+    struct PollResponse: Codable {
+        let ready: Bool
+        let message: String?
+        let error: Bool?
+    }
+
     extension AudioManager: AVAudioPlayerDelegate {
         func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
             DispatchQueue.main.async {
@@ -362,73 +363,6 @@ import SwiftUI
                 self.progressTimer?.invalidate()
                 self.progressTimer = nil
                 self.playbackProgress = 0.0
-            }
-        }
-    }
-
-    struct WelcomeView: View {
-        @State private var showChatView = false
-        @State private var showPermissionAlert = false
-
-        var body: some View {
-            VStack(spacing: 30) {
-                Spacer()
-
-                Text("Code On The Go")
-                    .font(.system(size: 40, weight: .bold))
-                    .multilineTextAlignment(.center)
-
-                Text(
-                    "Your AI coding assistant that helps you write, debug, and run code through natural conversation."
-                )
-                .font(.title3)
-                .multilineTextAlignment(.center)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
-
-                Spacer()
-
-                Button(action: {
-                    requestMicrophoneAccess()
-                }) {
-                    Text("Press to start chatting!")
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 15)
-                                .fill(Color.blue)
-                        )
-                        .shadow(radius: 5)
-                }
-                .padding(.horizontal)
-                .alert("Microphone Access Required", isPresented: $showPermissionAlert) {
-                    Button("Open Settings", role: .none) {
-                        if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(settingsUrl)
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Please enable microphone access in Settings to use voice chat.")
-                }
-            }
-            .padding()
-            .fullScreenCover(isPresented: $showChatView) {
-                ChatView()
-            }
-        }
-
-        private func requestMicrophoneAccess() {
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                DispatchQueue.main.async {
-                    if granted {
-                        showChatView = true
-                    } else {
-                        showPermissionAlert = true
-                    }
-                }
             }
         }
     }
@@ -533,7 +467,7 @@ import SwiftUI
                     }
 
                     if let error = audioManager.error {
-                        Text(error)
+                        Text("audio error")
                             .foregroundColor(.red)
                             .padding()
                     }

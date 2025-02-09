@@ -33,15 +33,17 @@ def process_audio(task_id, file_path):
         with open(file_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(model="whisper-1", file=audio_file)
             print(transcription)
-            task_dict[task_id]["response"] = transcript["text"]
+            task_dict[task_id]["response"] = None
             print("Task complete: ", task_id)
-            print("Response: ", transcript["text"])
+            print("Response: ", transcription)
         with open(f"{TRANSCRIPTIONS_FOLDER}/{task_id}.txt", "w") as f:
-            f.write(transcript["text"])
+            f.write(transcription.text)
 
         # TODO: PANNA LOOK HERE
         # Shell script to transcribe audio
-        explanation = process_message(transcript["text"])
+        print("Process message through shell tools")
+        explanation = process_message(transcription.text)
+        print("Explanation: ", explanation)
         task_dict[task_id]["response"] = explanation
 
     except Exception as e:
